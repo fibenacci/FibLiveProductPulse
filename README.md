@@ -94,6 +94,10 @@ Der Resolver nutzt Shopwares `RedisConnectionProvider` (Doku-konform) und fällt
 ### Polling / Lastverhalten
 - `pollIntervalMs`
   - Basisintervall aktiver Tabs
+- `smartPollingStockThreshold`
+  - reservierungsbewusste Stock-Berechnung nur bis zu diesem Bestand
+  - `0` = immer aktiv (Standardverhalten)
+  - oberhalb der Schwelle bleibt Stock-Polling aktiv, aber der Server nutzt einen leichteren Pfad ohne Reservierungsabgleich
 - `backgroundPollIntervalMs`
   - Intervall in Hintergrund-Tabs
 - `requestTimeoutMs`

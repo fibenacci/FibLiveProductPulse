@@ -32,6 +32,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         this.isDestroyed = false;
         this.stockStateEtag = null;
         this._cartPresenceLeaveSent = false;
+        this._cartPresencePollingActive = false;
 
         this.stockPoller = new SafePollingHelper({
             intervalMs: Number(this.options.pollIntervalMs),
@@ -45,15 +46,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         this.stockPoller.start();
 
         if (this.options.cartPresenceHeartbeatEndpoint) {
-            this.cartPresencePoller = new SafePollingHelper({
-                intervalMs: Number(this.options.pollIntervalMs),
-                backgroundIntervalMs: Number(this.options.backgroundPollIntervalMs),
-                requestTimeoutMs: Number(this.options.requestTimeoutMs),
-                maxBackoffMs: Number(this.options.maxBackoffMs),
-                jitterRatio: Number(this.options.jitterRatio),
-                task: ({signal}) => this._sendCartPresenceHeartbeat(signal),
-            });
-            this.cartPresencePoller.start();
+            this._setCartPresencePollingEnabled(true);
         }
 
         this._boundPageHide = this._handlePageHide.bind(this);
@@ -163,8 +156,50 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             return;
         }
 
+        this._syncSmartPollingMode(payload.data);
         this._updateDelivery(payload.data.statusCode);
         this._updateBuyFormVisibility(payload.data);
+    }
+
+    _syncSmartPollingMode(data) {
+        if (!this.options.cartPresenceHeartbeatEndpoint) {
+            return;
+        }
+
+        const smartPollingActive = Boolean(data?.smartPollingActive ?? true);
+        this._setCartPresencePollingEnabled(smartPollingActive);
+    }
+
+    _setCartPresencePollingEnabled(shouldEnable) {
+        const nextState = Boolean(shouldEnable && this.options.cartPresenceHeartbeatEndpoint);
+
+        if (nextState === this._cartPresencePollingActive) {
+            return;
+        }
+
+        this._cartPresencePollingActive = nextState;
+
+        if (!nextState) {
+            if (this.cartPresencePoller) {
+                this.cartPresencePoller.stop();
+                this.cartPresencePoller = null;
+            }
+
+            this._sendCartPresenceLeave();
+
+            return;
+        }
+
+        this._cartPresenceLeaveSent = false;
+        this.cartPresencePoller = new SafePollingHelper({
+            intervalMs: Number(this.options.pollIntervalMs),
+            backgroundIntervalMs: Number(this.options.backgroundPollIntervalMs),
+            requestTimeoutMs: Number(this.options.requestTimeoutMs),
+            maxBackoffMs: Number(this.options.maxBackoffMs),
+            jitterRatio: Number(this.options.jitterRatio),
+            task: ({signal}) => this._sendCartPresenceHeartbeat(signal),
+        });
+        this.cartPresencePoller.start();
     }
 
     _updateDelivery(statusCode) {

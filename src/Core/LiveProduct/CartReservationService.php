@@ -157,7 +157,7 @@ class CartReservationService
         }
 
         $redis = $this->redisConnectionResolver->getConnection($salesChannelId);
-        if ($redis !== null) {
+        if (!empty($redis)) {
             return $this->getAllocatedQuantityForCartTokenRedis($redis, $productId, $cartToken, $stock, $salesChannelId);
         }
 

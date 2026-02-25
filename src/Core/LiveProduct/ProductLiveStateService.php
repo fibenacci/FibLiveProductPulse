@@ -34,29 +34,40 @@ class ProductLiveStateService
         }
 
         $product = $this->fetchProductState($productId);
-        if ($product === null) {
+        if (empty($product)) {
             return null;
         }
 
-        $reservedQuantity = $this->cartReservationService->getReservedQuantityForProduct(
-            $productId,
-            $salesChannelId,
-            $excludeCartToken
+        $stock = max(0, (int) ($product['stock'] ?? 0));
+        $smartPollingThreshold =  $this->systemConfigService->getInt(
+            self::CONFIG_DOMAIN . 'smartPollingStockThreshold',
+            $salesChannelId
         );
 
-        $stock = max(0, (int) ($product['stock'] ?? 0));
+        $smartPollingActive = $smartPollingThreshold === 0 || $stock <= $smartPollingThreshold;
+
+        $reservedQuantity = 0;
+        $currentCartAllocatedQuantity = 0;
+        if ($smartPollingActive) {
+            $reservedQuantity = $this->cartReservationService->getReservedQuantityForProduct(
+                $productId,
+                $salesChannelId,
+                $excludeCartToken
+            );
+
+            if (!empty($excludeCartToken)) {
+                $currentCartAllocatedQuantity = $this->cartReservationService->getAllocatedQuantityForCartToken(
+                    $productId,
+                    $excludeCartToken,
+                    $stock,
+                    $salesChannelId
+                );
+            }
+        }
+
         $effectiveStock = max(0, $stock - $reservedQuantity);
         $minPurchase = max(1.0, (float) ($product['minPurchase'] ?? 1));
         $isCloseout = (bool) ($product['isCloseout'] ?? false);
-        $currentCartAllocatedQuantity = 0;
-        if (is_string($excludeCartToken) && $excludeCartToken !== '') {
-            $currentCartAllocatedQuantity = $this->cartReservationService->getAllocatedQuantityForCartToken(
-                $productId,
-                $excludeCartToken,
-                $stock,
-                $salesChannelId
-            );
-        }
         $statusCode = $this->resolveStatusCode(
             (bool) ($product['active'] ?? false),
             $stock,
@@ -78,7 +89,12 @@ class ProductLiveStateService
             'currentCartAllocatedQuantity' => $currentCartAllocatedQuantity,
             'statusCode' => $statusCode,
             'isReservedByOtherCart' => $statusCode === 'reserved',
-            'lockReservedProducts' => $this->systemConfigService->getBool(self::CONFIG_DOMAIN . 'lockReservedProducts', $salesChannelId),
+            'smartPollingActive' => $smartPollingActive,
+            'smartPollingStockThreshold' => $smartPollingThreshold,
+            'lockReservedProducts' => $this->systemConfigService->getBool(
+                self::CONFIG_DOMAIN . 'lockReservedProducts',
+                $salesChannelId
+            ),
             'restockTime' => (int) ($product['restockTime'] ?? 0),
             'isCloseout' => $isCloseout,
             'minPurchase' => $minPurchase,
@@ -88,13 +104,20 @@ class ProductLiveStateService
     /**
      * @return array<string, mixed>|null
      */
-    public function loadViewerState(string $productId, string $viewerClientToken, ?string $salesChannelId = null): ?array
-    {
+    public function loadViewerState(
+        string $productId,
+        string $viewerClientToken,
+        ?string $salesChannelId = null
+    ): ?array {
         if (!Uuid::isValid($productId)) {
             return null;
         }
 
-        $viewerCount = $this->viewerPresenceService->touchAndCountViewers($productId, $viewerClientToken, $salesChannelId);
+        $viewerCount = $this->viewerPresenceService->touchAndCountViewers(
+            $productId,
+            $viewerClientToken,
+            $salesChannelId
+        );
 
         return [
             'productId' => $productId,
@@ -127,6 +150,8 @@ class ProductLiveStateService
             'currentCartAllocatedQuantity' => $stockState['currentCartAllocatedQuantity'] ?? null,
             'statusCode' => $stockState['statusCode'] ?? null,
             'isReservedByOtherCart' => $stockState['isReservedByOtherCart'] ?? null,
+            'smartPollingActive' => $stockState['smartPollingActive'] ?? null,
+            'smartPollingStockThreshold' => $stockState['smartPollingStockThreshold'] ?? null,
             'lockReservedProducts' => $stockState['lockReservedProducts'] ?? null,
             'restockTime' => $stockState['restockTime'] ?? null,
             'isCloseout' => $stockState['isCloseout'] ?? null,
@@ -202,7 +227,10 @@ class ProductLiveStateService
             return $hasDeliveryTime ? 'available' : 'available';
         }
 
-        if ($stock >= $minPurchase && $reservedQuantity > 0 && $currentCartAllocatedQuantity < $minPurchase) {
+        if ($stock >= $minPurchase
+            && $reservedQuantity > 0
+            && $currentCartAllocatedQuantity < $minPurchase
+        ) {
             return 'reserved';
         }
 

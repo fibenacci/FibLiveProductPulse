@@ -35,6 +35,18 @@
             <required>true</required>
         </input-field>
 
+        <input-field type="int">
+            <name>smartPollingStockThreshold</name>
+            <label>Smart polling stock threshold</label>
+            <label lang="de-DE">Bestands-Schwelle fuer Smart Polling</label>
+            <helpText>Reservation-aware stock polling is only applied when stock is less than or equal to this value. Set 0 to always enable it.</helpText>
+            <helpText lang="de-DE">Reservierungsbewusstes Stock-Polling wird nur verwendet, wenn der Bestand kleiner/gleich diesem Wert ist. 0 aktiviert es immer.</helpText>
+            <defaultValue>0</defaultValue>
+            <min>0</min>
+            <max>1000000</max>
+            <required>true</required>
+        </input-field>
+
         <input-field type="bool">
             <name>showStockFeatureOnPdp</name>
             <label>Show live stock reservation status on PDP</label>
