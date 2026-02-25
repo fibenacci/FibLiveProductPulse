@@ -23,7 +23,7 @@ class LiveProductPulseController extends StorefrontController
     #[Route(
         path: '/fib/live-product-pulse/stock-state/{productId}',
         name: 'frontend.fib.live_product_pulse.stock_state',
-        defaults: ['XmlHttpRequest' => true],
+        defaults: ['XmlHttpRequest' => true, '_noStore' => true],
         methods: ['GET']
     )]
     public function stockState(
@@ -42,7 +42,7 @@ class LiveProductPulseController extends StorefrontController
         );
 
         if (empty($state)) {
-            return $this->jsonNoStore(['success' => false], Response::HTTP_NOT_FOUND);
+            return new JsonResponse(['success' => false], Response::HTTP_NOT_FOUND);
         }
 
         $response = new JsonResponse([
@@ -55,13 +55,17 @@ class LiveProductPulseController extends StorefrontController
         $response->headers->set('Pragma', 'no-cache');
         $response->setEtag($this->productLiveStateService->buildStockStateEtag($state), true);
 
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
         return $response;
     }
 
     #[Route(
         path: '/fib/live-product-pulse/viewers/{productId}',
         name: 'frontend.fib.live_product_pulse.viewers',
-        defaults: ['XmlHttpRequest' => true],
+        defaults: ['XmlHttpRequest' => true, '_noStore' => true],
         methods: ['POST']
     )]
     public function viewers(
@@ -76,7 +80,7 @@ class LiveProductPulseController extends StorefrontController
         $payload = json_decode($request->getContent(), true);
 
         $clientToken = '';
-        if (is_array($payload) && is_string($payload['clientToken'] ?? null)) {
+        if (!empty($payload['clientToken'] ?? null)) {
             $clientToken = $payload['clientToken'];
         }
 
@@ -87,10 +91,10 @@ class LiveProductPulseController extends StorefrontController
         );
 
         if (empty($state)) {
-            return $this->jsonNoStore(['success' => false], Response::HTTP_NOT_FOUND);
+            return new JsonResponse(['success' => false], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->jsonNoStore([
+        return new JsonResponse([
             'success' => true,
             'data' => $state,
         ]);
@@ -99,11 +103,13 @@ class LiveProductPulseController extends StorefrontController
     #[Route(
         path: '/fib/live-product-pulse/viewers/{productId}/leave',
         name: 'frontend.fib.live_product_pulse.viewers_leave',
-        defaults: ['XmlHttpRequest' => true],
+        defaults: ['XmlHttpRequest' => true, '_noStore' => true],
         methods: ['POST']
     )]
-    public function leaveViewers(string $productId, Request $request): JsonResponse
-    {
+    public function leaveViewers(
+        string $productId,
+        Request $request
+    ): JsonResponse {
         if (!Uuid::isValid($productId)) {
             throw new InvalidUuidException($productId);
         }
@@ -116,13 +122,13 @@ class LiveProductPulseController extends StorefrontController
 
         $this->productLiveStateService->removeViewer($productId, $clientToken);
 
-        return $this->jsonNoStore(['success' => true]);
+        return new JsonResponse(['success' => true]);
     }
 
     #[Route(
         path: '/fib/live-product-pulse/cart-presence/heartbeat',
         name: 'frontend.fib.live_product_pulse.cart_presence_heartbeat',
-        defaults: ['XmlHttpRequest' => true],
+        defaults: ['XmlHttpRequest' => true, '_noStore' => true],
         methods: ['POST']
     )]
     public function cartPresenceHeartbeat(SalesChannelContext $salesChannelContext): JsonResponse
@@ -132,33 +138,19 @@ class LiveProductPulseController extends StorefrontController
             $salesChannelContext->getSalesChannelId()
         );
 
-        return $this->jsonNoStore(['success' => true]);
+        return new JsonResponse(['success' => true]);
     }
 
     #[Route(
         path: '/fib/live-product-pulse/cart-presence/leave',
         name: 'frontend.fib.live_product_pulse.cart_presence_leave',
-        defaults: ['XmlHttpRequest' => true],
+        defaults: ['XmlHttpRequest' => true, '_noStore' => true],
         methods: ['POST']
     )]
     public function cartPresenceLeave(SalesChannelContext $salesChannelContext): JsonResponse
     {
         $this->productLiveStateService->clearCartPresence($salesChannelContext->getToken());
 
-        return $this->jsonNoStore(['success' => true]);
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function jsonNoStore(
-        array $payload,
-        int $status = Response::HTTP_OK
-    ): JsonResponse {
-        $response = new JsonResponse($payload, $status);
-        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-        $response->headers->set('Pragma', 'no-cache');
-
-        return $response;
+        return new JsonResponse(['success' => true]);
     }
 }

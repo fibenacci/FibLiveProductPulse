@@ -1,11 +1,10 @@
 import Plugin from 'src/plugin-system/plugin.class';
 import SafePollingHelper from '../helper/safe-polling.helper';
 
-export default class FibLiveProductPulsePlugin extends Plugin {
+export default class FibLiveProductPulseStockPlugin extends Plugin {
     static options = {
+        stockFeatureEnabled: true,
         stockStateEndpoint: '',
-        viewerEndpoint: '',
-        viewerLeaveEndpoint: '',
         cartPresenceHeartbeatEndpoint: '',
         cartPresenceLeaveEndpoint: '',
         pollIntervalMs: 4000,
@@ -13,7 +12,6 @@ export default class FibLiveProductPulsePlugin extends Plugin {
         requestTimeoutMs: 4000,
         maxBackoffMs: 60000,
         jitterRatio: 0.15,
-        clientTokenStorageKey: 'fib-live-product-pulse-client-token',
         statusTexts: {
             available: 'Verfuegbar',
             soldout: 'Vergriffen',
@@ -22,26 +20,18 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             preorder: 'Vorbestellung',
             notAvailable: 'Nicht verfuegbar',
         },
-        viewerTexts: {
-            zero: 'Gerade keine aktiven Betrachter',
-            one: '1 aktiver Betrachter',
-            many: '%count% aktive Betrachter',
-        },
     };
 
     init() {
-        this.deliveryWrapper = this.el.querySelector('[data-fib-live-product-pulse-delivery]');
-        this.viewerLine = this.el.querySelector('[data-fib-live-product-pulse-viewers]');
-        this.viewerLineText = this.el.querySelector('[data-fib-live-product-pulse-viewers-text]');
-
-        if (!this.deliveryWrapper || !this.options.stockStateEndpoint) {
+        this.stockFeatureEnabled = Boolean(this.options.stockFeatureEnabled);
+        if (!this.stockFeatureEnabled || !this.options.stockStateEndpoint) {
             return;
         }
 
-        this.clientToken = this._resolveClientToken();
+        this.deliveryWrapper = this.el;
         this.isDestroyed = false;
         this.stockStateEtag = null;
-        this._leaveSent = false;
+        this._cartPresenceLeaveSent = false;
 
         this.stockPoller = new SafePollingHelper({
             intervalMs: Number(this.options.pollIntervalMs),
@@ -52,22 +42,7 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             task: ({ signal }) => this._fetchStockState(signal),
             onResult: (payload) => this._handleStockPollingResult(payload),
         });
-
         this.stockPoller.start();
-
-        if (this.options.viewerEndpoint) {
-            this.viewerPoller = new SafePollingHelper({
-                intervalMs: Number(this.options.pollIntervalMs),
-                backgroundIntervalMs: Number(this.options.backgroundPollIntervalMs),
-                requestTimeoutMs: Number(this.options.requestTimeoutMs),
-                maxBackoffMs: Number(this.options.maxBackoffMs),
-                jitterRatio: Number(this.options.jitterRatio),
-                task: ({ signal }) => this._fetchViewerState(signal),
-                onResult: (payload) => this._handleViewerPollingResult(payload),
-            });
-
-            this.viewerPoller.start();
-        }
 
         if (this.options.cartPresenceHeartbeatEndpoint) {
             this.cartPresencePoller = new SafePollingHelper({
@@ -78,11 +53,10 @@ export default class FibLiveProductPulsePlugin extends Plugin {
                 jitterRatio: Number(this.options.jitterRatio),
                 task: ({ signal }) => this._sendCartPresenceHeartbeat(signal),
             });
-
             this.cartPresencePoller.start();
         }
 
-        this._boundPageHide = this._handleViewerLeave.bind(this);
+        this._boundPageHide = this._handlePageHide.bind(this);
         window.addEventListener('pagehide', this._boundPageHide);
         window.addEventListener('beforeunload', this._boundPageHide);
     }
@@ -95,11 +69,6 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             this.stockPoller = null;
         }
 
-        if (this.viewerPoller) {
-            this.viewerPoller.stop();
-            this.viewerPoller = null;
-        }
-
         if (this.cartPresencePoller) {
             this.cartPresencePoller.stop();
             this.cartPresencePoller = null;
@@ -110,7 +79,10 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             window.removeEventListener('beforeunload', this._boundPageHide);
         }
 
-        this._sendViewerLeave();
+        this._sendCartPresenceLeave();
+    }
+
+    _handlePageHide() {
         this._sendCartPresenceLeave();
     }
 
@@ -135,9 +107,7 @@ export default class FibLiveProductPulsePlugin extends Plugin {
         return fetch(this.options.stockStateEndpoint, requestOptions)
             .then((response) => {
                 if (response.status === 304) {
-                    return {
-                        notModified: true,
-                    };
+                    return { notModified: true };
                 }
 
                 if (!response.ok) {
@@ -164,41 +134,6 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             });
     }
 
-    _fetchViewerState(signal) {
-        const requestOptions = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify({
-                clientToken: this.clientToken,
-            }),
-            credentials: 'same-origin',
-            cache: 'no-store',
-        };
-
-        if (signal) {
-            requestOptions.signal = signal;
-        }
-
-        return fetch(this.options.viewerEndpoint, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error('Viewer polling request failed');
-                }
-
-                return response.json();
-            })
-            .then((payload) => {
-                if (!payload || payload.success !== true || !payload.data) {
-                    throw new Error('Viewer polling payload invalid');
-                }
-
-                return payload;
-            });
-    }
-
     _sendCartPresenceHeartbeat(signal) {
         const requestOptions = {
             method: 'POST',
@@ -213,43 +148,22 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             requestOptions.signal = signal;
         }
 
-        return fetch(this.options.cartPresenceHeartbeatEndpoint, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error('Cart presence heartbeat failed');
-                }
+        return fetch(this.options.cartPresenceHeartbeatEndpoint, requestOptions).then((response) => {
+            if (!response.ok) {
+                throw new Error('Cart presence heartbeat failed');
+            }
 
-                return response;
-            });
+            return response;
+        });
     }
 
     _handleStockPollingResult(payload) {
-        if (this.isDestroyed || !payload || payload.notModified === true) {
+        if (this.isDestroyed || !payload || payload.notModified === true || !payload.data) {
             return;
         }
 
-        if (!payload.data) {
-            return;
-        }
-
-        this._applyStockState(payload.data);
-    }
-
-    _handleViewerPollingResult(payload) {
-        if (this.isDestroyed || !payload || !payload.data) {
-            return;
-        }
-
-        this._applyViewerState(payload.data);
-    }
-
-    _applyStockState(data) {
-        this._updateDelivery(data.statusCode);
-        this._updateBuyFormVisibility(data);
-    }
-
-    _applyViewerState(data) {
-        this._updateViewers(Number(data.viewerCount || 0));
+        this._updateDelivery(payload.data.statusCode);
+        this._updateBuyFormVisibility(payload.data);
     }
 
     _updateDelivery(statusCode) {
@@ -338,15 +252,6 @@ export default class FibLiveProductPulsePlugin extends Plugin {
         link.setAttribute('href', schemaHref);
     }
 
-    _updateViewers(count) {
-        if (!this.viewerLine || !this.viewerLineText) {
-            return;
-        }
-
-        this.viewerLine.hidden = false;
-        this.viewerLineText.textContent = this._viewerText(count);
-    }
-
     _statusText(statusCode) {
         const texts = this.options.statusTexts || {};
 
@@ -373,126 +278,48 @@ export default class FibLiveProductPulsePlugin extends Plugin {
         return texts.notAvailable || 'Nicht verfuegbar';
     }
 
-    _viewerText(count) {
-        const texts = this.options.viewerTexts || {};
-
-        if (count <= 0) {
-            return texts.zero || 'Gerade keine aktiven Betrachter';
-        }
-
-        if (count === 1) {
-            return texts.one || '1 aktiver Betrachter';
-        }
-
-        return (texts.many || '%count% aktive Betrachter').replace('%count%', String(count));
-    }
-
     _statusConfig(statusCode) {
         switch (statusCode) {
             case 'available':
-                return {
-                    lineClass: 'delivery-available',
-                    indicatorClass: 'bg-success',
-                    schemaHref: 'https://schema.org/InStock',
-                };
+                return { lineClass: 'delivery-available', indicatorClass: 'bg-success', schemaHref: 'https://schema.org/InStock' };
             case 'preorder':
-                return {
-                    lineClass: 'delivery-preorder',
-                    indicatorClass: 'bg-warning',
-                    schemaHref: 'https://schema.org/PreOrder',
-                };
+                return { lineClass: 'delivery-preorder', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/PreOrder' };
             case 'restock':
-                return {
-                    lineClass: 'delivery-restock',
-                    indicatorClass: 'bg-warning',
-                    schemaHref: 'https://schema.org/LimitedAvailability',
-                };
+                return { lineClass: 'delivery-restock', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/LimitedAvailability' };
             case 'soldout':
-                return {
-                    lineClass: 'delivery-soldout',
-                    indicatorClass: 'bg-danger',
-                    schemaHref: 'https://schema.org/OutOfStock',
-                };
+                return { lineClass: 'delivery-soldout', indicatorClass: 'bg-danger', schemaHref: 'https://schema.org/OutOfStock' };
             case 'reserved':
-                return {
-                    lineClass: 'delivery-reserved',
-                    indicatorClass: 'bg-warning',
-                    schemaHref: 'https://schema.org/LimitedAvailability',
-                };
+                return { lineClass: 'delivery-reserved', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/LimitedAvailability' };
             default:
-                return {
-                    lineClass: 'delivery-not-available',
-                    indicatorClass: 'bg-danger',
-                    schemaHref: 'https://schema.org/LimitedAvailability',
-                };
+                return { lineClass: 'delivery-not-available', indicatorClass: 'bg-danger', schemaHref: 'https://schema.org/LimitedAvailability' };
         }
     }
 
-    _resolveClientToken() {
-        const storageKey = this.options.clientTokenStorageKey || 'fib-live-product-pulse-client-token';
-        const generated = () => {
-            if (window.crypto && window.crypto.getRandomValues) {
-                const bytes = new Uint8Array(16);
-                window.crypto.getRandomValues(bytes);
+    _updateBuyFormVisibility(data) {
+        const shouldLock = Boolean(data && data.lockReservedProducts);
+        const isReserved = Boolean(data && (data.isReservedByOtherCart || data.statusCode === 'reserved'));
+        const buyFormContainer = this._findBuyFormContainer();
 
-                return Array.from(bytes).map((value) => value.toString(16).padStart(2, '0')).join('');
-            }
-
-            return String(Date.now()) + String(Math.random()).replace('.', '');
-        };
-
-        try {
-            const existing = window.localStorage.getItem(storageKey);
-            if (existing) {
-                return existing;
-            }
-
-            const token = generated();
-            window.localStorage.setItem(storageKey, token);
-
-            return token;
-        } catch (_) {
-            if (!this._memoryClientToken) {
-                this._memoryClientToken = generated();
-            }
-
-            return this._memoryClientToken;
-        }
-    }
-
-    _handleViewerLeave() {
-        this._sendViewerLeave();
-        this._sendCartPresenceLeave();
-    }
-
-    _sendViewerLeave() {
-        if (this._leaveSent || !this.options.viewerLeaveEndpoint || !this.clientToken) {
+        if (!buyFormContainer) {
             return;
         }
 
-        this._leaveSent = true;
+        buyFormContainer.hidden = shouldLock && isReserved;
+    }
 
-        const body = JSON.stringify({
-            clientToken: this.clientToken,
-        });
-
-        if (navigator.sendBeacon) {
-            const blob = new Blob([body], { type: 'application/json' });
-            navigator.sendBeacon(this.options.viewerLeaveEndpoint, blob);
-
-            return;
+    _findBuyFormContainer() {
+        if (this.buyFormContainer) {
+            return this.buyFormContainer;
         }
 
-        fetch(this.options.viewerLeaveEndpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body,
-            credentials: 'same-origin',
-            keepalive: true,
-        }).catch(() => {});
+        const buyWidget = this.el.closest('.product-detail-buy');
+        if (!buyWidget) {
+            return null;
+        }
+
+        this.buyFormContainer = buyWidget.querySelector('.product-detail-form-container');
+
+        return this.buyFormContainer;
     }
 
     _sendCartPresenceLeave() {
@@ -518,38 +345,5 @@ export default class FibLiveProductPulsePlugin extends Plugin {
             credentials: 'same-origin',
             keepalive: true,
         }).catch(() => {});
-    }
-
-    _updateBuyFormVisibility(data) {
-        const shouldLock = Boolean(data && data.lockReservedProducts);
-        const isReserved = Boolean(data && (data.isReservedByOtherCart || data.statusCode === 'reserved'));
-        const buyFormContainer = this._findBuyFormContainer();
-
-        if (!buyFormContainer) {
-            return;
-        }
-
-        if (shouldLock && isReserved) {
-            buyFormContainer.hidden = true;
-
-            return;
-        }
-
-        buyFormContainer.hidden = false;
-    }
-
-    _findBuyFormContainer() {
-        if (this.buyFormContainer) {
-            return this.buyFormContainer;
-        }
-
-        const buyWidget = this.el.closest('.product-detail-buy');
-        if (!buyWidget) {
-            return null;
-        }
-
-        this.buyFormContainer = buyWidget.querySelector('.product-detail-form-container');
-
-        return this.buyFormContainer;
     }
 }

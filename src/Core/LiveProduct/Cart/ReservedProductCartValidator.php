@@ -2,7 +2,6 @@
 
 namespace Fib\LiveProductPulse\Core\LiveProduct\Cart;
 
-use Fib\LiveProductPulse\Config\LiveProductPulseConfig;
 use Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService;
 use Shopware\Core\Checkout\Cart\Cart;
 use Shopware\Core\Checkout\Cart\CartValidatorInterface;
@@ -12,14 +11,16 @@ use Shopware\Core\Checkout\Cart\Error\GenericCartError;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class ReservedProductCartValidator implements CartValidatorInterface
 {
+    private const CONFIG_DOMAIN = 'FibLiveProductPulse.config.';
     private const ERROR_KEY = 'fib-live-product-pulse.storefront.cart.reserved';
 
     public function __construct(
         private readonly ProductLiveStateService $productLiveStateService,
-        private readonly LiveProductPulseConfig $config
+        private readonly SystemConfigService $systemConfigService
     ) {
     }
 
@@ -28,7 +29,10 @@ class ReservedProductCartValidator implements CartValidatorInterface
         ErrorCollection $errors,
         SalesChannelContext $context
     ): void {
-        if (!$this->config->isLockReservedProducts($context->getSalesChannelId())) {
+        if (!$this->systemConfigService->getBool(
+            self::CONFIG_DOMAIN . 'lockReservedProducts',
+            $context->getSalesChannelId()
+        )) {
             return;
         }
 

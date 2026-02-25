@@ -6,28 +6,24 @@
     <services>
         <defaults autowire="true" autoconfigure="true" public="false"/>
 
-        <service id="Fib\LiveProductPulse\Config\LiveProductPulseConfig">
-            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
-        </service>
-
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
-            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
-            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
-            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
-            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService"/>
             <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService"/>
             <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService"/>
@@ -35,7 +31,7 @@
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\Cart\ReservedProductCartValidator">
             <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService"/>
-            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <tag name="shopware.cart.validator"/>
         </service>
 

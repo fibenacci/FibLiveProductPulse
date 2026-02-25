@@ -18,6 +18,24 @@
         </input-field>
 
         <input-field type="bool">
+            <name>showStockFeatureOnPdp</name>
+            <label>Show live stock reservation status on PDP</label>
+            <label lang="de-DE">Live-Bestands-/Reservierungsstatus auf PDP anzeigen</label>
+            <helpText>Shows the live stock/reservation availability message on the product detail page.</helpText>
+            <helpText lang="de-DE">Zeigt die Live-Bestands-/Reservierungsverfuegbarkeit auf der Produktdetailseite an.</helpText>
+            <defaultValue>true</defaultValue>
+        </input-field>
+
+        <input-field type="bool">
+            <name>showViewerFeatureOnPdp</name>
+            <label>Show live viewer counter on PDP</label>
+            <label lang="de-DE">Live-Betrachterzaehler auf PDP anzeigen</label>
+            <helpText>Shows the number of active viewers on the product detail page.</helpText>
+            <helpText lang="de-DE">Zeigt die Anzahl aktiver Betrachter auf der Produktdetailseite an.</helpText>
+            <defaultValue>true</defaultValue>
+        </input-field>
+
+        <input-field type="bool">
             <name>lockReservedProducts</name>
             <label>Lock reserved products for other users</label>
             <label lang="de-DE">Reservierte Artikel fuer andere Nutzer sperren</label>

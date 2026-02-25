@@ -1,10 +1,17 @@
 import './scss/base.scss';
-import FibLiveProductPulsePlugin from './plugin/fib-live-product-pulse.plugin';
+import FibLiveProductPulseStockPlugin from './plugin/fib-live-product-pulse-stock.plugin';
+import FibLiveProductPulseViewerPlugin from './plugin/fib-live-product-pulse-viewer.plugin';
 
 const PluginManager = window.PluginManager;
 
 PluginManager.register(
-    'FibLiveProductPulse',
-    FibLiveProductPulsePlugin,
-    '[data-fib-live-product-pulse]'
+    'FibLiveProductPulseStock',
+    FibLiveProductPulseStockPlugin,
+    '[data-fib-live-product-pulse-stock]'
+);
+
+PluginManager.register(
+    'FibLiveProductPulseViewer',
+    FibLiveProductPulseViewerPlugin,
+    '[data-fib-live-product-pulse-viewer]'
 );

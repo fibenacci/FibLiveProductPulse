@@ -3,19 +3,20 @@
 namespace Fib\LiveProductPulse\Core\LiveProduct;
 
 use Doctrine\DBAL\Connection;
-use Fib\LiveProductPulse\Config\LiveProductPulseConfig;
 use Shopware\Core\Checkout\Cart\Cart;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Checkout\Cart\LineItem\LineItemCollection;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class CartReservationService
 {
+    private const CONFIG_DOMAIN = 'FibLiveProductPulse.config.';
     private const CLEANUP_PROBABILITY_DIVISOR = 100;
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly LiveProductPulseConfig $config
+        private readonly SystemConfigService $systemConfigService
     ) {
     }
 
@@ -52,12 +53,12 @@ class CartReservationService
             }
 
             $this->connection->executeStatement(<<<SQL
-INSERT INTO fib_live_product_pulse_cart_reservation (`cart_token_hash`, `product_id`, `quantity`, `created_at`, `updated_at`)
-VALUES (:cartTokenHash, :productId, :quantity, :createdAt, :updatedAt)
-ON DUPLICATE KEY UPDATE
-    `quantity` = VALUES(`quantity`),
-    `updated_at` = VALUES(`updated_at`)
-SQL, [
+                INSERT INTO fib_live_product_pulse_cart_reservation (`cart_token_hash`, `product_id`, `quantity`, `created_at`, `updated_at`)
+                VALUES (:cartTokenHash, :productId, :quantity, :createdAt, :updatedAt)
+                ON DUPLICATE KEY UPDATE
+                    `quantity` = VALUES(`quantity`),
+                    `updated_at` = VALUES(`updated_at`)
+            SQL, [
                 'cartTokenHash' => $cartTokenHash,
                 'productId' => Uuid::fromHexToBytes($productId),
                 'quantity' => $quantity,
@@ -90,8 +91,8 @@ SQL, [
             return 0;
         }
 
-        $ttlSeconds = $this->config->getReservationTtlSeconds($salesChannelId);
-        $cartPresenceTtlSeconds = $this->config->getCartPresenceTtlSeconds($salesChannelId);
+        $ttlSeconds = $this->getReservationTtlSeconds($salesChannelId);
+        $cartPresenceTtlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
         $cutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $ttlSeconds)))
             ->format('Y-m-d H:i:s.v');
         $presenceCutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $cartPresenceTtlSeconds)))
@@ -109,15 +110,15 @@ SQL, [
         }
 
         $quantity = $this->connection->fetchOne(<<<SQL
-SELECT COALESCE(SUM(quantity), 0)
-FROM fib_live_product_pulse_cart_reservation r
-INNER JOIN fib_live_product_pulse_cart_presence cp
-    ON cp.cart_token_hash = r.cart_token_hash
-   AND cp.last_seen_at >= :presenceCutoff
-WHERE r.product_id = :productId
-  AND r.updated_at >= :cutoff
-{$excludeClause}
-SQL, [
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM fib_live_product_pulse_cart_reservation r
+            INNER JOIN fib_live_product_pulse_cart_presence cp
+                ON cp.cart_token_hash = r.cart_token_hash
+               AND cp.last_seen_at >= :presenceCutoff
+            WHERE r.product_id = :productId
+              AND r.updated_at >= :cutoff
+            {$excludeClause}
+        SQL, [
             ...$params,
             'presenceCutoff' => $presenceCutoff,
         ]);
@@ -173,23 +174,23 @@ SQL, [
      */
     private function fetchActiveReservationRows(string $productId, ?string $salesChannelId = null): array
     {
-        $ttlSeconds = $this->config->getReservationTtlSeconds($salesChannelId);
-        $cartPresenceTtlSeconds = $this->config->getCartPresenceTtlSeconds($salesChannelId);
+        $ttlSeconds = $this->getReservationTtlSeconds($salesChannelId);
+        $cartPresenceTtlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
         $cutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $ttlSeconds)))
             ->format('Y-m-d H:i:s.v');
         $presenceCutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $cartPresenceTtlSeconds)))
             ->format('Y-m-d H:i:s.v');
 
         $rows = $this->connection->fetchAllAssociative(<<<SQL
-SELECT LOWER(HEX(r.cart_token_hash)) AS cart_token_hash, r.quantity
-FROM fib_live_product_pulse_cart_reservation r
-INNER JOIN fib_live_product_pulse_cart_presence cp
-    ON cp.cart_token_hash = r.cart_token_hash
-   AND cp.last_seen_at >= :presenceCutoff
-WHERE r.product_id = :productId
-  AND r.updated_at >= :cutoff
-ORDER BY r.created_at ASC, r.cart_token_hash ASC
-SQL, [
+            SELECT LOWER(HEX(r.cart_token_hash)) AS cart_token_hash, r.quantity
+            FROM fib_live_product_pulse_cart_reservation r
+            INNER JOIN fib_live_product_pulse_cart_presence cp
+                ON cp.cart_token_hash = r.cart_token_hash
+               AND cp.last_seen_at >= :presenceCutoff
+            WHERE r.product_id = :productId
+              AND r.updated_at >= :cutoff
+            ORDER BY r.created_at ASC, r.cart_token_hash ASC
+        SQL, [
             'productId' => Uuid::fromHexToBytes($productId),
             'cutoff' => $cutoff,
             'presenceCutoff' => $presenceCutoff,
@@ -225,8 +226,10 @@ SQL, [
     /**
      * @param array<string, int> $quantities
      */
-    private function collectProductQuantitiesRecursive(LineItemCollection $lineItems, array &$quantities): void
-    {
+    private function collectProductQuantitiesRecursive(
+        LineItemCollection $lineItems,
+        array &$quantities
+    ): void {
         foreach ($lineItems as $lineItem) {
             if ($lineItem->getType() === LineItem::PRODUCT_LINE_ITEM_TYPE) {
                 $referencedId = $lineItem->getReferencedId();
@@ -249,7 +252,7 @@ SQL, [
             return;
         }
 
-        $ttlSeconds = $this->config->getReservationTtlSeconds();
+        $ttlSeconds = $this->getReservationTtlSeconds();
         $cutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $ttlSeconds)))
             ->format('Y-m-d H:i:s.v');
 
@@ -257,5 +260,31 @@ SQL, [
             'DELETE FROM fib_live_product_pulse_cart_reservation WHERE updated_at < :cutoff',
             ['cutoff' => $cutoff]
         );
+    }
+
+    private function getReservationTtlSeconds(?string $salesChannelId = null): int
+    {
+        return $this->getConfiguredInt('reservationTtlSeconds', 1800, 60, 86400, $salesChannelId);
+    }
+
+    private function getCartPresenceTtlSeconds(?string $salesChannelId = null): int
+    {
+        return $this->getConfiguredInt('cartPresenceTtlSeconds', 120, 10, 3600, $salesChannelId);
+    }
+
+    private function getConfiguredInt(
+        string $key,
+        int $default,
+        int $min,
+        int $max,
+        ?string $salesChannelId = null
+    ): int {
+        $value = $this->systemConfigService->getInt(self::CONFIG_DOMAIN . $key, $salesChannelId);
+
+        if ($value < $min || $value > $max) {
+            return $default;
+        }
+
+        return $value;
     }
 }

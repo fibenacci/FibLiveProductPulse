@@ -3,16 +3,17 @@
 namespace Fib\LiveProductPulse\Core\LiveProduct;
 
 use Doctrine\DBAL\Connection;
-use Fib\LiveProductPulse\Config\LiveProductPulseConfig;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class ViewerPresenceService
 {
+    private const CONFIG_DOMAIN = 'FibLiveProductPulse.config.';
     private const CLEANUP_PROBABILITY_DIVISOR = 60;
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly LiveProductPulseConfig $config
+        private readonly SystemConfigService $systemConfigService
     ) {
     }
 
@@ -27,17 +28,17 @@ class ViewerPresenceService
             return 0;
         }
 
-        $ttlSeconds = $this->config->getViewerTtlSeconds($salesChannelId);
+        $ttlSeconds = $this->getViewerTtlSeconds($salesChannelId);
         $tokenHash = hash('sha256', $normalizedToken, true);
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s.v');
         $cutoff = (new \DateTimeImmutable(sprintf('-%d seconds', $ttlSeconds)))
             ->format('Y-m-d H:i:s.v');
 
         $this->connection->executeStatement(<<<SQL
-INSERT INTO fib_live_product_pulse_viewer_presence (`product_id`, `viewer_token_hash`, `created_at`, `last_seen_at`)
-VALUES (:productId, :tokenHash, :createdAt, :lastSeenAt)
-ON DUPLICATE KEY UPDATE `last_seen_at` = VALUES(`last_seen_at`)
-SQL, [
+            INSERT INTO fib_live_product_pulse_viewer_presence (`product_id`, `viewer_token_hash`, `created_at`, `last_seen_at`)
+            VALUES (:productId, :tokenHash, :createdAt, :lastSeenAt)
+            ON DUPLICATE KEY UPDATE `last_seen_at` = VALUES(`last_seen_at`)
+        SQL, [
             'productId' => Uuid::fromHexToBytes($productId),
             'tokenHash' => $tokenHash,
             'createdAt' => $now,
@@ -47,12 +48,12 @@ SQL, [
         $this->cleanupStalePresenceMaybe($cutoff);
 
         $count = $this->connection->fetchOne(<<<SQL
-SELECT COUNT(*)
-FROM fib_live_product_pulse_viewer_presence
-WHERE product_id = :productId
-  AND last_seen_at >= :cutoff
-  AND viewer_token_hash <> :tokenHash
-SQL, [
+            SELECT COUNT(*)
+            FROM fib_live_product_pulse_viewer_presence
+            WHERE product_id = :productId
+              AND last_seen_at >= :cutoff
+              AND viewer_token_hash <> :tokenHash
+        SQL, [
             'productId' => Uuid::fromHexToBytes($productId),
             'cutoff' => $cutoff,
             'tokenHash' => $tokenHash,
@@ -80,8 +81,7 @@ SQL, [
 
     private function normalizeClientToken(string $clientToken): ?string
     {
-        $clientToken = trim($clientToken);
-        if ($clientToken === '') {
+        if (empty($clientToken)) {
             return null;
         }
 
@@ -106,5 +106,16 @@ SQL, [
             'DELETE FROM fib_live_product_pulse_viewer_presence WHERE last_seen_at < :cutoff',
             ['cutoff' => $cutoff]
         );
+    }
+
+    private function getViewerTtlSeconds(?string $salesChannelId = null): int
+    {
+        $value = $this->systemConfigService->getInt(self::CONFIG_DOMAIN . 'viewerTtlSeconds', $salesChannelId);
+
+        if ($value < 10 || $value > 600) {
+            return 45;
+        }
+
+        return $value;
     }
 }

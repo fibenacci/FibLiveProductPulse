@@ -3,15 +3,17 @@
 namespace Fib\LiveProductPulse\Core\LiveProduct;
 
 use Doctrine\DBAL\Connection;
-use Fib\LiveProductPulse\Config\LiveProductPulseConfig;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 class ProductLiveStateService
 {
+    private const CONFIG_DOMAIN = 'FibLiveProductPulse.config.';
+
     public function __construct(
         private readonly Connection $connection,
-        private readonly LiveProductPulseConfig $config,
+        private readonly SystemConfigService $systemConfigService,
         private readonly CartReservationService $cartReservationService,
         private readonly CartPresenceService $cartPresenceService,
         private readonly ViewerPresenceService $viewerPresenceService
@@ -76,7 +78,7 @@ class ProductLiveStateService
             'currentCartAllocatedQuantity' => $currentCartAllocatedQuantity,
             'statusCode' => $statusCode,
             'isReservedByOtherCart' => $statusCode === 'reserved',
-            'lockReservedProducts' => $this->config->isLockReservedProducts($salesChannelId),
+            'lockReservedProducts' => $this->systemConfigService->getBool(self::CONFIG_DOMAIN . 'lockReservedProducts', $salesChannelId),
             'restockTime' => (int) ($product['restockTime'] ?? 0),
             'isCloseout' => $isCloseout,
             'minPurchase' => $minPurchase,
@@ -140,19 +142,19 @@ class ProductLiveStateService
     private function fetchProductState(string $productId): ?array
     {
         $row = $this->connection->fetchAssociative(<<<SQL
-SELECT
-    p.active,
-    p.stock,
-    p.min_purchase,
-    p.is_closeout,
-    p.restock_time,
-    p.release_date,
-    p.delivery_time_id
-FROM product p
-WHERE p.id = :productId
-  AND p.version_id = :versionId
-LIMIT 1
-SQL, [
+            SELECT
+                p.active,
+                p.stock,
+                p.min_purchase,
+                p.is_closeout,
+                p.restock_time,
+                p.release_date,
+                p.delivery_time_id
+            FROM product p
+            WHERE p.id = :productId
+              AND p.version_id = :versionId
+            LIMIT 1
+        SQL, [
             'productId' => Uuid::fromHexToBytes($productId),
             'versionId' => Uuid::fromHexToBytes(Defaults::LIVE_VERSION),
         ]);
