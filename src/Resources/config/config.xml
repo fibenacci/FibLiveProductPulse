@@ -5,6 +5,24 @@
         <title>Client Polling</title>
         <title lang="de-DE">Client-Polling</title>
 
+        <input-field type="bool">
+            <name>useRedisBackend</name>
+            <label>Use Redis backend for pulse runtime data</label>
+            <label lang="de-DE">Redis-Backend fuer Pulse-Laufzeitdaten verwenden</label>
+            <helpText>Uses Redis for viewer/cart presence and reservations when a configured Shopware Redis connection is available. Falls back to SQL otherwise.</helpText>
+            <helpText lang="de-DE">Verwendet Redis fuer Viewer-/Cart-Presence und Reservierungen, wenn eine konfigurierte Shopware-Redis-Verbindung verfuegbar ist. Sonst SQL-Fallback.</helpText>
+            <defaultValue>false</defaultValue>
+        </input-field>
+
+        <input-field type="text">
+            <name>redisConnectionName</name>
+            <label>Shopware Redis connection name</label>
+            <label lang="de-DE">Shopware-Redis-Verbindungsname</label>
+            <helpText>Name from shopware.redis.connections (for example "default").</helpText>
+            <helpText lang="de-DE">Name aus shopware.redis.connections (z. B. "default").</helpText>
+            <defaultValue>default</defaultValue>
+        </input-field>
+
         <input-field type="int">
             <name>pollIntervalMs</name>
             <label>Polling interval (ms)</label>

@@ -6,19 +6,28 @@
     <services>
         <defaults autowire="true" autoconfigure="true" public="false"/>
 
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider">
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Redis\RedisConnectionProvider"/>
+            <argument type="service" id="logger"/>
+        </service>
+
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService">

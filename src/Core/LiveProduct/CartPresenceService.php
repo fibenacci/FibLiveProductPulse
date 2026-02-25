@@ -12,13 +12,21 @@ class CartPresenceService
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly SystemConfigService $systemConfigService
+        private readonly SystemConfigService $systemConfigService,
+        private readonly PulseRedisClientProvider $redisClientProvider
     ) {
     }
 
     public function touchCartToken(string $cartToken, ?string $salesChannelId = null): void
     {
         if ($cartToken === '') {
+            return;
+        }
+
+        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        if (!empty($redis)) {
+            $this->touchCartTokenRedis($redis, $cartToken, $salesChannelId);
+
             return;
         }
 
@@ -43,6 +51,13 @@ class CartPresenceService
     public function clearCartToken(string $cartToken): void
     {
         if ($cartToken === '') {
+            return;
+        }
+
+        $redis = $this->redisClientProvider->getConnection();
+        if (!empty($redis)) {
+            $this->clearCartTokenRedis($redis, $cartToken);
+
             return;
         }
 
@@ -72,5 +87,37 @@ class CartPresenceService
         }
 
         return $value;
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function touchCartTokenRedis(object $redis, string $cartToken, ?string $salesChannelId): void
+    {
+        if (!method_exists($redis, 'zAdd') || !method_exists($redis, 'zRemRangeByScore')) {
+            return;
+        }
+
+        $ttlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
+        $now = time();
+        $cutoff = $now - $ttlSeconds;
+        $member = bin2hex(hash('sha256', $cartToken, true));
+        $key = 'fib:lpp:cart_presence';
+
+        $redis->zAdd($key, $now, $member);
+        $redis->zRemRangeByScore($key, '-inf', (string) $cutoff);
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function clearCartTokenRedis(object $redis, string $cartToken): void
+    {
+        if (!method_exists($redis, 'zRem')) {
+            return;
+        }
+
+        $member = bin2hex(hash('sha256', $cartToken, true));
+        $redis->zRem('fib:lpp:cart_presence', $member);
     }
 }

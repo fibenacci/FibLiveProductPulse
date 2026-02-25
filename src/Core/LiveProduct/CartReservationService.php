@@ -16,7 +16,8 @@ class CartReservationService
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly SystemConfigService $systemConfigService
+        private readonly SystemConfigService $systemConfigService,
+        private readonly PulseRedisClientProvider $redisClientProvider
     ) {
     }
 
@@ -28,6 +29,13 @@ class CartReservationService
         }
 
         $quantities = $this->collectProductQuantities($cart->getLineItems());
+        $redis = $this->redisClientProvider->getConnection();
+        if ($redis !== null) {
+            $this->syncCartRedis($redis, $cartToken, $quantities);
+
+            return;
+        }
+
         $cartTokenHash = hash('sha256', $cartToken, true);
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s.v');
 
@@ -76,6 +84,13 @@ class CartReservationService
             return;
         }
 
+        $redis = $this->redisClientProvider->getConnection();
+        if ($redis !== null) {
+            $this->clearCartReservationsRedis($redis, $cartToken);
+
+            return;
+        }
+
         $this->connection->delete('fib_live_product_pulse_cart_reservation', [
             'cart_token_hash' => hash('sha256', $cartToken, true),
         ]);
@@ -89,6 +104,11 @@ class CartReservationService
     {
         if (!Uuid::isValid($productId)) {
             return 0;
+        }
+
+        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        if ($redis !== null) {
+            return $this->getReservedQuantityForProductRedis($redis, $productId, $salesChannelId, $excludeCartToken);
         }
 
         $ttlSeconds = $this->getReservationTtlSeconds($salesChannelId);
@@ -136,6 +156,11 @@ class CartReservationService
             return 0;
         }
 
+        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        if ($redis !== null) {
+            return $this->getAllocatedQuantityForCartTokenRedis($redis, $productId, $cartToken, $stock, $salesChannelId);
+        }
+
         $rows = $this->fetchActiveReservationRows($productId, $salesChannelId);
         if ($rows === []) {
             return 0;
@@ -164,6 +189,156 @@ class CartReservationService
                 // We already crossed the available stock window.
                 continue;
             }
+        }
+
+        return $allocated;
+    }
+
+    /**
+     * @param object $redis
+     * @param array<string,int> $quantities
+     */
+    private function syncCartRedis(object $redis, string $cartToken, array $quantities): void
+    {
+        if (!method_exists($redis, 'sMembers')) {
+            return;
+        }
+
+        $cartHashHex = $this->cartTokenHashHex($cartToken);
+        $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
+        $now = time();
+
+        $existingProducts = $redis->sMembers($cartProductsKey);
+        if (!is_array($existingProducts)) {
+            $existingProducts = [];
+        }
+
+        foreach ($existingProducts as $existingProductId) {
+            if (!is_string($existingProductId) || isset($quantities[$existingProductId])) {
+                continue;
+            }
+
+            $this->removeRedisReservationForCartProduct($redis, $cartHashHex, $existingProductId);
+        }
+
+        foreach ($quantities as $productId => $quantity) {
+            if (!Uuid::isValid($productId) || $quantity < 1) {
+                continue;
+            }
+
+            $qtyKey = $this->redisReservationQtyKey($productId);
+            $orderKey = $this->redisReservationOrderKey($productId);
+            $updatedKey = $this->redisReservationUpdatedKey($productId);
+
+            if (method_exists($redis, 'zScore')) {
+                $existingOrder = $redis->zScore($orderKey, $cartHashHex);
+                if ($existingOrder === false) {
+                    $redis->zAdd($orderKey, $now, $cartHashHex);
+                }
+            } else {
+                $redis->zAdd($orderKey, $now, $cartHashHex);
+            }
+
+            $redis->hSet($qtyKey, $cartHashHex, (string) $quantity);
+            $redis->hSet($updatedKey, $cartHashHex, (string) $now);
+            $redis->sAdd($cartProductsKey, $productId);
+        }
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function clearCartReservationsRedis(object $redis, string $cartToken): void
+    {
+        if (!method_exists($redis, 'sMembers')) {
+            return;
+        }
+
+        $cartHashHex = $this->cartTokenHashHex($cartToken);
+        $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
+        $products = $redis->sMembers($cartProductsKey);
+        if (!is_array($products)) {
+            $products = [];
+        }
+
+        foreach ($products as $productId) {
+            if (!is_string($productId)) {
+                continue;
+            }
+
+            $this->removeRedisReservationForCartProduct($redis, $cartHashHex, $productId);
+        }
+
+        if (method_exists($redis, 'del')) {
+            $redis->del($cartProductsKey);
+        }
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function getReservedQuantityForProductRedis(
+        object $redis,
+        string $productId,
+        ?string $salesChannelId,
+        ?string $excludeCartToken
+    ): int {
+        $rows = $this->fetchActiveReservationRowsRedis($redis, $productId, $salesChannelId);
+        if ($rows === []) {
+            return 0;
+        }
+
+        $excludeHash = null;
+        if (is_string($excludeCartToken) && $excludeCartToken !== '') {
+            $excludeHash = $this->cartTokenHashHex($excludeCartToken);
+        }
+
+        $sum = 0;
+        foreach ($rows as $row) {
+            if ($excludeHash !== null && ($row['cartTokenHash'] ?? '') === $excludeHash) {
+                continue;
+            }
+
+            $sum += max(0, (int) ($row['quantity'] ?? 0));
+        }
+
+        return max(0, $sum);
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function getAllocatedQuantityForCartTokenRedis(
+        object $redis,
+        string $productId,
+        string $cartToken,
+        int $stock,
+        ?string $salesChannelId
+    ): int {
+        $rows = $this->fetchActiveReservationRowsRedis($redis, $productId, $salesChannelId);
+        if ($rows === [] || $stock < 1) {
+            return 0;
+        }
+
+        $targetHash = $this->cartTokenHashHex($cartToken);
+        $cursor = 0;
+        $allocated = 0;
+
+        foreach ($rows as $row) {
+            $quantity = max(0, (int) ($row['quantity'] ?? 0));
+            if ($quantity < 1) {
+                continue;
+            }
+
+            $rangeStart = $cursor;
+            $rangeEnd = $cursor + $quantity;
+            $overlap = max(0, min($rangeEnd, $stock) - $rangeStart);
+
+            if ($overlap > 0 && (($row['cartTokenHash'] ?? '') === $targetHash)) {
+                $allocated += $overlap;
+            }
+
+            $cursor = $rangeEnd;
         }
 
         return $allocated;
@@ -286,5 +461,119 @@ class CartReservationService
         }
 
         return $value;
+    }
+
+    /**
+     * @param object $redis
+     */
+    private function removeRedisReservationForCartProduct(object $redis, string $cartHashHex, string $productId): void
+    {
+        if (!Uuid::isValid($productId)) {
+            return;
+        }
+
+        $qtyKey = $this->redisReservationQtyKey($productId);
+        $orderKey = $this->redisReservationOrderKey($productId);
+        $updatedKey = $this->redisReservationUpdatedKey($productId);
+        $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
+
+        if (method_exists($redis, 'hDel')) {
+            $redis->hDel($qtyKey, $cartHashHex);
+            $redis->hDel($updatedKey, $cartHashHex);
+        }
+
+        if (method_exists($redis, 'zRem')) {
+            $redis->zRem($orderKey, $cartHashHex);
+        }
+
+        if (method_exists($redis, 'sRem')) {
+            $redis->sRem($cartProductsKey, $productId);
+        }
+    }
+
+    /**
+     * @param object $redis
+     *
+     * @return list<array{cartTokenHash:string,quantity:int}>
+     */
+    private function fetchActiveReservationRowsRedis(object $redis, string $productId, ?string $salesChannelId = null): array
+    {
+        if (!method_exists($redis, 'zRange') || !method_exists($redis, 'zScore') || !method_exists($redis, 'hGet')) {
+            return [];
+        }
+
+        $ttlSeconds = $this->getReservationTtlSeconds($salesChannelId);
+        $cartPresenceTtlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
+        $reservationCutoff = time() - $ttlSeconds;
+        $presenceCutoff = time() - $cartPresenceTtlSeconds;
+
+        $orderKey = $this->redisReservationOrderKey($productId);
+        $qtyKey = $this->redisReservationQtyKey($productId);
+        $updatedKey = $this->redisReservationUpdatedKey($productId);
+        $presenceKey = 'fib:lpp:cart_presence';
+
+        $members = $redis->zRange($orderKey, 0, -1);
+        if (!is_array($members) || $members === []) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($members as $member) {
+            if (!is_string($member) || $member === '') {
+                continue;
+            }
+
+            $presenceScore = $redis->zScore($presenceKey, $member);
+            if ($presenceScore === false || (int) $presenceScore < $presenceCutoff) {
+                continue;
+            }
+
+            $updatedAt = $redis->hGet($updatedKey, $member);
+            if ($updatedAt === false || (int) $updatedAt < $reservationCutoff) {
+                continue;
+            }
+
+            $quantity = $redis->hGet($qtyKey, $member);
+            if ($quantity === false) {
+                continue;
+            }
+
+            $quantityInt = (int) $quantity;
+            if ($quantityInt < 1) {
+                continue;
+            }
+
+            $result[] = [
+                'cartTokenHash' => $member,
+                'quantity' => $quantityInt,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function cartTokenHashHex(string $cartToken): string
+    {
+        return bin2hex(hash('sha256', $cartToken, true));
+    }
+
+    private function redisCartProductsKey(string $cartHashHex): string
+    {
+        return 'fib:lpp:cart:' . $cartHashHex . ':products';
+    }
+
+    private function redisReservationQtyKey(string $productId): string
+    {
+        return 'fib:lpp:resv:' . $productId . ':qty';
+    }
+
+    private function redisReservationOrderKey(string $productId): string
+    {
+        return 'fib:lpp:resv:' . $productId . ':order';
+    }
+
+    private function redisReservationUpdatedKey(string $productId): string
+    {
+        return 'fib:lpp:resv:' . $productId . ':upd';
     }
 }
