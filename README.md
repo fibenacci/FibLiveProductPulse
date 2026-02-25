@@ -2,12 +2,12 @@
 
 `FibLiveProductPulse` erweitert die Shopware-PDP um zwei optionale Live-Funktionen:
 
-- Live-Verfuegbarkeit / Reservierungsstatus
-- Live-Betrachterzaehler (Viewer)
+- Live-Verfügbarkeit / Reservierungsstatus
+- Live-Betrachterzähler (Viewer)
 
 Der Name `Pulse` bezieht sich auf die technische Arbeitsweise:
 - regelmäßige Polling-Impulse (`smart polling`)
-- Heartbeats für aktive Viewer und aktive Warenkoerbe
+- Heartbeats für aktive Viewer und aktive Warenkörbe
 - Backoff + Jitter zur Lastverteilung bei Fehlern / Hochlast
 
 Damit entsteht kein permanenter WebSocket-Kanal, sondern ein kontrollierter, robust konfigurierbarer "Puls" zwischen Browser und Server.
@@ -26,7 +26,7 @@ Damit entsteht kein permanenter WebSocket-Kanal, sondern ein kontrollierter, rob
 
 ### 2. Optionales Sperren reservierter Artikel
 Wenn aktiviert:
-- wird das PDP-Kaufformular fuer andere Nutzer bei `reserviert` ausgeblendet
+- wird das PDP-Kaufformular für andere Nutzer bei `reserviert` ausgeblendet
 - wird der Checkout backendseitig blockiert (Cart Validator)
 
 Wenn deaktiviert:
@@ -42,12 +42,12 @@ Wenn deaktiviert:
 
 Das Plugin arbeitet bewusst mit `smart polling` statt "dauerhaft offenem Kanal":
 
-- Polling mit Intervallen fuer planbare Last
-- `ETag` + `304 Not Modified` fuer den Stock-Status (smart polling)
+- Polling mit Intervallen für planbare Last
+- `ETag` + `304 Not Modified` für den Stock-Status (smart polling)
 - Jitter gegen synchronisierte Request-Spitzen
 - exponentieller Backoff bei Fehlern
 - Hintergrund-Tab-Intervall reduziert Requests
-- Heartbeat/Leave-Mechanik fuer Viewer und Warenkorbpräsenz
+- Heartbeat/Leave-Mechanik für Viewer und Warenkorbpräsenz
 
 Kurz: Nicht "dauerhaft streamen", sondern in kontrollierten Impulsen synchronisieren.
 
@@ -67,17 +67,17 @@ Das Plugin kann die fluechtigen Pulse-Daten optional ueber Redis abwickeln:
 
 - `ViewerPresence`
 - `CartPresence`
-- Cart-Reservierungen (inkl. Prioritaetsreihenfolge fuer "wer zuerst kommt, mahlt zuerst")
+- Cart-Reservierungen (inkl. Prioritätsreihenfolge für "wer zuerst kommt, mahlt zuerst")
 
 Die Auswahl passiert runtime ueber die Plugin-Konfiguration:
 - `useRedisBackend`
 - `redisConnectionName`
 
-Technisch wird dafuer ein Resolver verwendet:
+Technisch wird dafür ein Resolver verwendet:
 - `PulseRedisConnectionResolverInterface`
 - `PulseRedisConnectionResolver`
 
-Der Resolver nutzt Shopwares `RedisConnectionProvider` (Doku-konform) und faellt bei deaktiviertem Redis, fehlender Connection oder nicht unterstuetztem Client automatisch auf SQL zurueck.
+Der Resolver nutzt Shopwares `RedisConnectionProvider` (Doku-konform) und fällt bei deaktiviertem Redis, fehlender Connection oder nicht unterstuetztem Client automatisch auf SQL zurueck.
 
 ## Konfiguration (Plugin-Config)
 
@@ -85,7 +85,7 @@ Der Resolver nutzt Shopwares `RedisConnectionProvider` (Doku-konform) und faellt
 - `showStockFeatureOnPdp`
   - Live-Bestands-/Reservierungsstatus auf der PDP ein/aus
 - `showViewerFeatureOnPdp`
-  - Live-Betrachterzaehler auf der PDP ein/aus
+  - Live-Betrachterzähler auf der PDP ein/aus
 
 ### Reservierungslogik
 - `lockReservedProducts`
@@ -138,7 +138,7 @@ bin/console cache:clear
 
 Danach Storefront neu bauen (projektübliches Build-Kommando).
 
-## Hinweise fuer Tests
+## Hinweise für Tests
 
 - Bei Verhaltenstests mit mehreren Browsern/Sessions können alte Testdaten stören.
 - Bei Bedarf Pulse-Tabellen leeren (Testsystem):
