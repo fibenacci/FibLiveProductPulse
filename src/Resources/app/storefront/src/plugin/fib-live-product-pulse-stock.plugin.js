@@ -39,7 +39,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             requestTimeoutMs: Number(this.options.requestTimeoutMs),
             maxBackoffMs: Number(this.options.maxBackoffMs),
             jitterRatio: Number(this.options.jitterRatio),
-            task: ({ signal }) => this._fetchStockState(signal),
+            task: ({signal}) => this._fetchStockState(signal),
             onResult: (payload) => this._handleStockPollingResult(payload),
         });
         this.stockPoller.start();
@@ -51,7 +51,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
                 requestTimeoutMs: Number(this.options.requestTimeoutMs),
                 maxBackoffMs: Number(this.options.maxBackoffMs),
                 jitterRatio: Number(this.options.jitterRatio),
-                task: ({ signal }) => this._sendCartPresenceHeartbeat(signal),
+                task: ({signal}) => this._sendCartPresenceHeartbeat(signal),
             });
             this.cartPresencePoller.start();
         }
@@ -104,34 +104,32 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             requestOptions.signal = signal;
         }
 
-        return fetch(this.options.stockStateEndpoint, requestOptions)
-            .then((response) => {
-                if (response.status === 304) {
-                    return { notModified: true };
-                }
+        return fetch(this.options.stockStateEndpoint, requestOptions).then((response) => {
+            if (response.status === 304) {
+                return {notModified: true};
+            }
 
-                if (!response.ok) {
-                    throw new Error('Polling request failed');
-                }
+            if (!response.ok) {
+                throw new Error('Polling request failed');
+            }
 
-                const nextEtag = response.headers.get('ETag');
-                if (nextEtag) {
-                    this.stockStateEtag = nextEtag;
-                }
+            const nextEtag = response.headers.get('ETag');
+            if (nextEtag) {
+                this.stockStateEtag = nextEtag;
+            }
 
-                return response.json();
-            })
-            .then((payload) => {
-                if (payload && payload.notModified === true) {
-                    return payload;
-                }
-
-                if (!payload || payload.success !== true || !payload.data) {
-                    throw new Error('Polling payload invalid');
-                }
-
+            return response.json();
+        }).then((payload) => {
+            if (payload?.notModified === true) {
                 return payload;
-            });
+            }
+
+            if (!payload?.success || !payload?.data) {
+                throw new Error('Polling payload invalid');
+            }
+
+            return payload;
+        });
     }
 
     _sendCartPresenceHeartbeat(signal) {
@@ -148,7 +146,10 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             requestOptions.signal = signal;
         }
 
-        return fetch(this.options.cartPresenceHeartbeatEndpoint, requestOptions).then((response) => {
+        return fetch(
+            this.options.cartPresenceHeartbeatEndpoint,
+            requestOptions
+        ).then((response) => {
             if (!response.ok) {
                 throw new Error('Cart presence heartbeat failed');
             }
@@ -158,7 +159,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
     }
 
     _handleStockPollingResult(payload) {
-        if (this.isDestroyed || !payload || payload.notModified === true || !payload.data) {
+        if (this.isDestroyed || payload?.notModified === true || !payload?.data) {
             return;
         }
 
@@ -226,7 +227,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         statusLine.className = 'delivery-information delivery-available';
 
         const shippingFreeLine = deliveryInfo.querySelector('.delivery-information.delivery-shipping-free');
-        if (shippingFreeLine && shippingFreeLine.parentNode) {
+        if (shippingFreeLine?.parentNode) {
             shippingFreeLine.insertAdjacentElement('afterend', statusLine);
         } else {
             deliveryInfo.appendChild(statusLine);
@@ -253,7 +254,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
     }
 
     _statusText(statusCode) {
-        const texts = this.options.statusTexts || {};
+        const texts = this.options.statusTexts;
 
         if (statusCode === 'available' && texts.available) {
             return texts.available;
@@ -275,29 +276,53 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             return texts.preorder;
         }
 
-        return texts.notAvailable || 'Nicht verfuegbar';
+        return texts.notAvailable;
     }
 
     _statusConfig(statusCode) {
         switch (statusCode) {
             case 'available':
-                return { lineClass: 'delivery-available', indicatorClass: 'bg-success', schemaHref: 'https://schema.org/InStock' };
+                return {
+                    lineClass: 'delivery-available',
+                    indicatorClass: 'bg-success',
+                    schemaHref: 'https://schema.org/InStock'
+                };
             case 'preorder':
-                return { lineClass: 'delivery-preorder', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/PreOrder' };
+                return {
+                    lineClass: 'delivery-preorder',
+                    indicatorClass: 'bg-warning',
+                    schemaHref: 'https://schema.org/PreOrder'
+                };
             case 'restock':
-                return { lineClass: 'delivery-restock', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/LimitedAvailability' };
+                return {
+                    lineClass: 'delivery-restock',
+                    indicatorClass: 'bg-warning',
+                    schemaHref: 'https://schema.org/LimitedAvailability'
+                };
             case 'soldout':
-                return { lineClass: 'delivery-soldout', indicatorClass: 'bg-danger', schemaHref: 'https://schema.org/OutOfStock' };
+                return {
+                    lineClass: 'delivery-soldout',
+                    indicatorClass: 'bg-danger',
+                    schemaHref: 'https://schema.org/OutOfStock'
+                };
             case 'reserved':
-                return { lineClass: 'delivery-reserved', indicatorClass: 'bg-warning', schemaHref: 'https://schema.org/LimitedAvailability' };
+                return {
+                    lineClass: 'delivery-reserved',
+                    indicatorClass: 'bg-warning',
+                    schemaHref: 'https://schema.org/LimitedAvailability'
+                };
             default:
-                return { lineClass: 'delivery-not-available', indicatorClass: 'bg-danger', schemaHref: 'https://schema.org/LimitedAvailability' };
+                return {
+                    lineClass: 'delivery-not-available',
+                    indicatorClass: 'bg-danger',
+                    schemaHref: 'https://schema.org/LimitedAvailability'
+                };
         }
     }
 
     _updateBuyFormVisibility(data) {
-        const shouldLock = Boolean(data && data.lockReservedProducts);
-        const isReserved = Boolean(data && (data.isReservedByOtherCart || data.statusCode === 'reserved'));
+        const shouldLock = Boolean(data?.lockReservedProducts);
+        const isReserved = Boolean((data?.isReservedByOtherCart || data?.statusCode === 'reserved'));
         const buyFormContainer = this._findBuyFormContainer();
 
         if (!buyFormContainer) {
@@ -330,7 +355,11 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         this._cartPresenceLeaveSent = true;
 
         if (navigator.sendBeacon) {
-            navigator.sendBeacon(this.options.cartPresenceLeaveEndpoint, new Blob(['{}'], { type: 'application/json' }));
+            navigator.sendBeacon(
+                this.options.cartPresenceLeaveEndpoint,
+                new Blob(['{}'],
+                    {type: 'application/json'}
+                ));
 
             return;
         }
@@ -344,6 +373,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             body: '{}',
             credentials: 'same-origin',
             keepalive: true,
-        }).catch(() => {});
+        }).catch(() => {
+        });
     }
 }

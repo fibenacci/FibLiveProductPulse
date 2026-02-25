@@ -14,7 +14,7 @@ class ViewerPresenceService
     public function __construct(
         private readonly Connection $connection,
         private readonly SystemConfigService $systemConfigService,
-        private readonly PulseRedisClientProvider $redisClientProvider
+        private readonly PulseRedisConnectionResolverInterface $redisConnectionResolver
     ) {
     }
 
@@ -29,7 +29,7 @@ class ViewerPresenceService
             return 0;
         }
 
-        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        $redis = $this->redisConnectionResolver->getConnection($salesChannelId);
         if (!empty($redis)) {
             return $this->touchAndCountViewersRedis($redis, $productId, $normalizedToken, $salesChannelId);
         }
@@ -79,7 +79,7 @@ class ViewerPresenceService
             return;
         }
 
-        $redis = $this->redisClientProvider->getConnection();
+        $redis = $this->redisConnectionResolver->getConnection();
         if (!empty($redis)) {
             $this->removeViewerRedis($redis, $productId, $normalizedToken);
 

@@ -41,7 +41,7 @@ export default class FibLiveProductPulseViewerPlugin extends Plugin {
             requestTimeoutMs: Number(this.options.requestTimeoutMs),
             maxBackoffMs: Number(this.options.maxBackoffMs),
             jitterRatio: Number(this.options.jitterRatio),
-            task: ({ signal }) => this._fetchViewerState(signal),
+            task: ({signal}) => this._fetchViewerState(signal),
             onResult: (payload) => this._handleViewerPollingResult(payload),
         });
         this.viewerPoller.start();
@@ -89,25 +89,23 @@ export default class FibLiveProductPulseViewerPlugin extends Plugin {
             requestOptions.signal = signal;
         }
 
-        return fetch(this.options.viewerEndpoint, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error('Viewer polling request failed');
-                }
+        return fetch(this.options.viewerEndpoint, requestOptions).then((response) => {
+            if (!response.ok) {
+                throw new Error('Viewer polling request failed');
+            }
 
-                return response.json();
-            })
-            .then((payload) => {
-                if (!payload || payload.success !== true || !payload.data) {
-                    throw new Error('Viewer polling payload invalid');
-                }
+            return response.json();
+        }).then((payload) => {
+            if (!payload?.success || !payload.data) {
+                throw new Error('Viewer polling payload invalid');
+            }
 
-                return payload;
-            });
+            return payload;
+        });
     }
 
     _handleViewerPollingResult(payload) {
-        if (this.isDestroyed || !payload || !payload.data) {
+        if (this.isDestroyed || !payload?.data) {
             return;
         }
 
@@ -177,7 +175,7 @@ export default class FibLiveProductPulseViewerPlugin extends Plugin {
         });
 
         if (navigator.sendBeacon) {
-            const blob = new Blob([body], { type: 'application/json' });
+            const blob = new Blob([body], {type: 'application/json'});
             navigator.sendBeacon(this.options.viewerLeaveEndpoint, blob);
 
             return;
@@ -192,6 +190,7 @@ export default class FibLiveProductPulseViewerPlugin extends Plugin {
             body,
             credentials: 'same-origin',
             keepalive: true,
-        }).catch(() => {});
+        }).catch(() => {
+        });
     }
 }

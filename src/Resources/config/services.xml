@@ -6,28 +6,29 @@
     <services>
         <defaults autowire="true" autoconfigure="true" public="false"/>
 
-        <service id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider">
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolver">
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <argument type="service" id="Shopware\Core\Framework\Adapter\Redis\RedisConnectionProvider"/>
             <argument type="service" id="logger"/>
         </service>
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolverInterface" alias="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolver"/>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
-            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolverInterface"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
-            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolverInterface"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
-            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisClientProvider"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\PulseRedisConnectionResolverInterface"/>
         </service>
 
         <service id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService">

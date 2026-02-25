@@ -13,7 +13,7 @@ class CartPresenceService
     public function __construct(
         private readonly Connection $connection,
         private readonly SystemConfigService $systemConfigService,
-        private readonly PulseRedisClientProvider $redisClientProvider
+        private readonly PulseRedisConnectionResolverInterface $redisConnectionResolver
     ) {
     }
 
@@ -23,7 +23,7 @@ class CartPresenceService
             return;
         }
 
-        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        $redis = $this->redisConnectionResolver->getConnection($salesChannelId);
         if (!empty($redis)) {
             $this->touchCartTokenRedis($redis, $cartToken, $salesChannelId);
 
@@ -54,7 +54,7 @@ class CartPresenceService
             return;
         }
 
-        $redis = $this->redisClientProvider->getConnection();
+        $redis = $this->redisConnectionResolver->getConnection();
         if (!empty($redis)) {
             $this->clearCartTokenRedis($redis, $cartToken);
 

@@ -61,6 +61,24 @@ Stock- und Viewer-Funktion sind auf der PDP getrennt konfigurierbar und auch fro
 Gemeinsame technische Basis:
 - `SafePollingHelper` (wiederverwendbarer Polling-/Backoff-/Jitter-Helper)
 
+## Redis-Backend (optional, mit SQL-Fallback)
+
+Das Plugin kann die fluechtigen Pulse-Daten optional ueber Redis abwickeln:
+
+- `ViewerPresence`
+- `CartPresence`
+- Cart-Reservierungen (inkl. Prioritaetsreihenfolge fuer "wer zuerst kommt, mahlt zuerst")
+
+Die Auswahl passiert runtime ueber die Plugin-Konfiguration:
+- `useRedisBackend`
+- `redisConnectionName`
+
+Technisch wird dafuer ein Resolver verwendet:
+- `PulseRedisConnectionResolverInterface`
+- `PulseRedisConnectionResolver`
+
+Der Resolver nutzt Shopwares `RedisConnectionProvider` (Doku-konform) und faellt bei deaktiviertem Redis, fehlender Connection oder nicht unterstuetztem Client automatisch auf SQL zurueck.
+
 ## Konfiguration (Plugin-Config)
 
 ### PDP-Anzeige

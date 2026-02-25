@@ -17,7 +17,7 @@ class CartReservationService
     public function __construct(
         private readonly Connection $connection,
         private readonly SystemConfigService $systemConfigService,
-        private readonly PulseRedisClientProvider $redisClientProvider
+        private readonly PulseRedisConnectionResolverInterface $redisConnectionResolver
     ) {
     }
 
@@ -29,8 +29,8 @@ class CartReservationService
         }
 
         $quantities = $this->collectProductQuantities($cart->getLineItems());
-        $redis = $this->redisClientProvider->getConnection();
-        if ($redis !== null) {
+        $redis = $this->redisConnectionResolver->getConnection();
+        if (!empty($redis)) {
             $this->syncCartRedis($redis, $cartToken, $quantities);
 
             return;
@@ -84,7 +84,7 @@ class CartReservationService
             return;
         }
 
-        $redis = $this->redisClientProvider->getConnection();
+        $redis = $this->redisConnectionResolver->getConnection();
         if ($redis !== null) {
             $this->clearCartReservationsRedis($redis, $cartToken);
 
@@ -106,7 +106,7 @@ class CartReservationService
             return 0;
         }
 
-        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        $redis = $this->redisConnectionResolver->getConnection($salesChannelId);
         if ($redis !== null) {
             return $this->getReservedQuantityForProductRedis($redis, $productId, $salesChannelId, $excludeCartToken);
         }
@@ -156,7 +156,7 @@ class CartReservationService
             return 0;
         }
 
-        $redis = $this->redisClientProvider->getConnection($salesChannelId);
+        $redis = $this->redisConnectionResolver->getConnection($salesChannelId);
         if ($redis !== null) {
             return $this->getAllocatedQuantityForCartTokenRedis($redis, $productId, $cartToken, $stock, $salesChannelId);
         }
