@@ -19,7 +19,7 @@ class CartPresenceService
 
     public function touchCartToken(string $cartToken, ?string $salesChannelId = null): void
     {
-        if ($cartToken === '') {
+        if (empty($cartToken)) {
             return;
         }
 
@@ -90,14 +90,9 @@ class CartPresenceService
     }
 
     /**
-     * @param object $redis
      */
     private function touchCartTokenRedis(object $redis, string $cartToken, ?string $salesChannelId): void
     {
-        if (!method_exists($redis, 'zAdd') || !method_exists($redis, 'zRemRangeByScore')) {
-            return;
-        }
-
         $ttlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
         $now = time();
         $cutoff = $now - $ttlSeconds;
@@ -109,14 +104,9 @@ class CartPresenceService
     }
 
     /**
-     * @param object $redis
      */
     private function clearCartTokenRedis(object $redis, string $cartToken): void
     {
-        if (!method_exists($redis, 'zRem')) {
-            return;
-        }
-
         $member = bin2hex(hash('sha256', $cartToken, true));
         $redis->zRem('fib:lpp:cart_presence', $member);
     }

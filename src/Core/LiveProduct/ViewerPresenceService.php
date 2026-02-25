@@ -141,10 +141,6 @@ class ViewerPresenceService
         string $normalizedToken,
         ?string $salesChannelId
     ): int {
-        if (!method_exists($redis, 'zAdd') || !method_exists($redis, 'zRemRangeByScore') || !method_exists($redis, 'zCount')) {
-            return 0;
-        }
-
         $ttlSeconds = $this->getViewerTtlSeconds($salesChannelId);
         $now = time();
         $cutoff = $now - $ttlSeconds;
@@ -156,11 +152,9 @@ class ViewerPresenceService
 
         $count = (int) $redis->zCount($key, (string) $cutoff, '+inf');
 
-        if (method_exists($redis, 'zScore')) {
-            $selfScore = $redis->zScore($key, $member);
-            if ($selfScore !== false && (int) $selfScore >= $cutoff) {
-                $count -= 1;
-            }
+        $selfScore = $redis->zScore($key, $member);
+        if ($selfScore !== false && (int) $selfScore >= $cutoff) {
+            $count -= 1;
         }
 
         return max(0, $count);
@@ -171,10 +165,6 @@ class ViewerPresenceService
      */
     private function removeViewerRedis(object $redis, string $productId, string $normalizedToken): void
     {
-        if (!method_exists($redis, 'zRem')) {
-            return;
-        }
-
         $member = bin2hex(hash('sha256', $normalizedToken, true));
         $key = 'fib:lpp:viewers:' . $productId;
         $redis->zRem($key, $member);

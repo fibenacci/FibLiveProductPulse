@@ -58,15 +58,6 @@ class PulseRedisConnectionResolver implements PulseRedisConnectionResolverInterf
 
             $connection = $this->redisConnectionProvider->getConnection($connectionName);
 
-            if (str_starts_with($connection::class, 'Predis\\')) {
-                $this->logger->warning('FibLiveProductPulse Redis fallback to SQL (Predis client not supported by pulse resolver)', [
-                    'connectionName' => $connectionName,
-                    'redisClass' => $connection::class,
-                ]);
-
-                return null;
-            }
-
             $this->cachedConnectionName = $connectionName;
             $this->cachedConnection = $connection;
 

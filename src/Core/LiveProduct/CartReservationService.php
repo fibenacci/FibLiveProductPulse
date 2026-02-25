@@ -200,10 +200,6 @@ class CartReservationService
      */
     private function syncCartRedis(object $redis, string $cartToken, array $quantities): void
     {
-        if (!method_exists($redis, 'sMembers')) {
-            return;
-        }
-
         $cartHashHex = $this->cartTokenHashHex($cartToken);
         $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
         $now = time();
@@ -230,12 +226,8 @@ class CartReservationService
             $orderKey = $this->redisReservationOrderKey($productId);
             $updatedKey = $this->redisReservationUpdatedKey($productId);
 
-            if (method_exists($redis, 'zScore')) {
-                $existingOrder = $redis->zScore($orderKey, $cartHashHex);
-                if ($existingOrder === false) {
-                    $redis->zAdd($orderKey, $now, $cartHashHex);
-                }
-            } else {
+            $existingOrder = $redis->zScore($orderKey, $cartHashHex);
+            if ($existingOrder === false) {
                 $redis->zAdd($orderKey, $now, $cartHashHex);
             }
 
@@ -250,10 +242,6 @@ class CartReservationService
      */
     private function clearCartReservationsRedis(object $redis, string $cartToken): void
     {
-        if (!method_exists($redis, 'sMembers')) {
-            return;
-        }
-
         $cartHashHex = $this->cartTokenHashHex($cartToken);
         $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
         $products = $redis->sMembers($cartProductsKey);
@@ -269,13 +257,10 @@ class CartReservationService
             $this->removeRedisReservationForCartProduct($redis, $cartHashHex, $productId);
         }
 
-        if (method_exists($redis, 'del')) {
-            $redis->del($cartProductsKey);
-        }
+        $redis->del($cartProductsKey);
     }
 
     /**
-     * @param object $redis
      */
     private function getReservedQuantityForProductRedis(
         object $redis,
@@ -477,31 +462,17 @@ class CartReservationService
         $updatedKey = $this->redisReservationUpdatedKey($productId);
         $cartProductsKey = $this->redisCartProductsKey($cartHashHex);
 
-        if (method_exists($redis, 'hDel')) {
-            $redis->hDel($qtyKey, $cartHashHex);
-            $redis->hDel($updatedKey, $cartHashHex);
-        }
-
-        if (method_exists($redis, 'zRem')) {
-            $redis->zRem($orderKey, $cartHashHex);
-        }
-
-        if (method_exists($redis, 'sRem')) {
-            $redis->sRem($cartProductsKey, $productId);
-        }
+        $redis->hDel($qtyKey, $cartHashHex);
+        $redis->hDel($updatedKey, $cartHashHex);
+        $redis->zRem($orderKey, $cartHashHex);
+        $redis->sRem($cartProductsKey, $productId);
     }
 
     /**
-     * @param object $redis
-     *
      * @return list<array{cartTokenHash:string,quantity:int}>
      */
     private function fetchActiveReservationRowsRedis(object $redis, string $productId, ?string $salesChannelId = null): array
     {
-        if (!method_exists($redis, 'zRange') || !method_exists($redis, 'zScore') || !method_exists($redis, 'hGet')) {
-            return [];
-        }
-
         $ttlSeconds = $this->getReservationTtlSeconds($salesChannelId);
         $cartPresenceTtlSeconds = $this->getCartPresenceTtlSeconds($salesChannelId);
         $reservationCutoff = time() - $ttlSeconds;
