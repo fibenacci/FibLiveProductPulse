@@ -1,4 +1,3 @@
-import './scss/base.scss';
 import FibLiveProductPulseStockPlugin from './plugin/fib-live-product-pulse-stock.plugin';
 import FibLiveProductPulseViewerPlugin from './plugin/fib-live-product-pulse-viewer.plugin';
 

@@ -1,4 +1,5 @@
 import Plugin from 'src/plugin-system/plugin.class';
+import ElementLoadingIndicatorUtil from 'src/utility/loading-indicator/element-loading-indicator.util';
 import SafePollingHelper from '../helper/safe-polling.helper';
 
 export default class FibLiveProductPulseStockPlugin extends Plugin {
@@ -31,8 +32,10 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         this.deliveryWrapper = this.el;
         this.isDestroyed = false;
         this.stockStateEtag = null;
+        this._initialLoadingResolved = false;
         this._cartPresenceLeaveSent = false;
         this._cartPresencePollingActive = false;
+        this._showInitialLoading();
 
         this.stockPoller = new SafePollingHelper({
             intervalMs: Number(this.options.pollIntervalMs),
@@ -42,6 +45,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             jitterRatio: Number(this.options.jitterRatio),
             task: ({signal}) => this._fetchStockState(signal),
             onResult: (payload) => this._handleStockPollingResult(payload),
+            onError: () => this._handleStockPollingError(),
         });
         this.stockPoller.start();
 
@@ -73,6 +77,7 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
         }
 
         this._sendCartPresenceLeave();
+        this._clearInitialLoading();
     }
 
     _handlePageHide() {
@@ -156,9 +161,38 @@ export default class FibLiveProductPulseStockPlugin extends Plugin {
             return;
         }
 
+        this._clearInitialLoading();
         this._syncSmartPollingMode(payload.data);
         this._updateDelivery(payload.data.statusCode);
         this._updateBuyFormVisibility(payload.data);
+    }
+
+    _handleStockPollingError() {
+        this._clearInitialLoading();
+    }
+
+    _showInitialLoading() {
+        if (!this.deliveryWrapper) {
+            return;
+        }
+
+        this.deliveryWrapper.classList.add('fib-live-product-pulse-is-loading');
+        ElementLoadingIndicatorUtil.create(this.deliveryWrapper);
+    }
+
+    _clearInitialLoading() {
+        if (this._initialLoadingResolved) {
+            return;
+        }
+
+        this._initialLoadingResolved = true;
+
+        if (!this.deliveryWrapper) {
+            return;
+        }
+
+        this.deliveryWrapper.classList.remove('fib-live-product-pulse-is-loading');
+        ElementLoadingIndicatorUtil.remove(this.deliveryWrapper);
     }
 
     _syncSmartPollingMode(data) {
