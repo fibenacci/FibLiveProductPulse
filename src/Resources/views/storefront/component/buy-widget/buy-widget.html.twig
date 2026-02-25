@@ -1,0 +1,44 @@
+{% sw_extends '@Storefront/storefront/component/buy-widget/buy-widget.html.twig' %}
+
+{% block buy_widget_delivery_informations %}
+    {% set fibLiveProductPulseOptions = {
+        stockStateEndpoint: path('frontend.fib.live_product_pulse.stock_state', { productId: product.id }),
+        viewerEndpoint: path('frontend.fib.live_product_pulse.viewers', { productId: product.id }),
+        viewerLeaveEndpoint: path('frontend.fib.live_product_pulse.viewers_leave', { productId: product.id }),
+        cartPresenceHeartbeatEndpoint: path('frontend.fib.live_product_pulse.cart_presence_heartbeat'),
+        cartPresenceLeaveEndpoint: path('frontend.fib.live_product_pulse.cart_presence_leave'),
+        pollIntervalMs: config('FibLiveProductPulse.config.pollIntervalMs') ?: 4000,
+        backgroundPollIntervalMs: config('FibLiveProductPulse.config.backgroundPollIntervalMs') ?: 15000,
+        requestTimeoutMs: config('FibLiveProductPulse.config.requestTimeoutMs') ?: 4000,
+        maxBackoffMs: config('FibLiveProductPulse.config.maxBackoffMs') ?: 60000,
+        jitterRatio: ((config('FibLiveProductPulse.config.jitterPercent') ?: 15) / 100),
+        clientTokenStorageKey: 'fib-live-product-pulse-client-token',
+        statusTexts: {
+            available: 'fib-live-product-pulse.storefront.status.available'|trans|sw_sanitize,
+            soldout: 'fib-live-product-pulse.storefront.status.soldout'|trans|sw_sanitize,
+            reserved: 'fib-live-product-pulse.storefront.status.reserved'|trans|sw_sanitize,
+            restock: 'fib-live-product-pulse.storefront.status.restock'|trans|sw_sanitize,
+            preorder: 'fib-live-product-pulse.storefront.status.preorder'|trans|sw_sanitize,
+            notAvailable: 'fib-live-product-pulse.storefront.status.notAvailable'|trans|sw_sanitize
+        },
+        viewerTexts: {
+            zero: 'fib-live-product-pulse.storefront.viewers.zero'|trans|sw_sanitize,
+            one: 'fib-live-product-pulse.storefront.viewers.one'|trans|sw_sanitize,
+            many: 'fib-live-product-pulse.storefront.viewers.many'|trans|sw_sanitize
+        }
+    } %}
+
+    <div class="fib-live-product-pulse"
+         data-fib-live-product-pulse="true"
+         data-fib-live-product-pulse-options="{{ fibLiveProductPulseOptions|json_encode|escape('html_attr') }}"
+    >
+        <div class="product-detail-delivery-information" data-fib-live-product-pulse-delivery>
+            {% sw_include '@Storefront/storefront/component/delivery-information.html.twig' %}
+        </div>
+
+        <p class="delivery-information fib-live-product-pulse-viewers" data-fib-live-product-pulse-viewers hidden>
+            <span class="delivery-status-indicator bg-info"></span>
+            <span data-fib-live-product-pulse-viewers-text></span>
+        </p>
+    </div>
+{% endblock %}

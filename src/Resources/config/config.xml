@@ -1,0 +1,118 @@
+<?xml version="1.0" ?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/trunk/src/Core/System/SystemConfig/Schema/config.xsd">
+    <card>
+        <title>Client Polling</title>
+        <title lang="de-DE">Client-Polling</title>
+
+        <input-field type="int">
+            <name>pollIntervalMs</name>
+            <label>Polling interval (ms)</label>
+            <label lang="de-DE">Polling-Intervall (ms)</label>
+            <helpText>Base interval for active tabs.</helpText>
+            <helpText lang="de-DE">Basisintervall fuer aktive Tabs.</helpText>
+            <defaultValue>4000</defaultValue>
+            <min>1000</min>
+            <max>60000</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="bool">
+            <name>lockReservedProducts</name>
+            <label>Lock reserved products for other users</label>
+            <label lang="de-DE">Reservierte Artikel fuer andere Nutzer sperren</label>
+            <helpText>If enabled, the PDP buy form is hidden and checkout is blocked backend-side while another active cart reserves the item.</helpText>
+            <helpText lang="de-DE">Wenn aktiv, wird das Kauf-Formular auf der PDP ausgeblendet und der Checkout backendseitig blockiert, solange ein anderer aktiver Warenkorb den Artikel reserviert.</helpText>
+            <defaultValue>true</defaultValue>
+        </input-field>
+
+        <input-field type="int">
+            <name>backgroundPollIntervalMs</name>
+            <label>Background polling interval (ms)</label>
+            <label lang="de-DE">Polling-Intervall Hintergrund-Tab (ms)</label>
+            <helpText>Used when the browser tab is not visible.</helpText>
+            <helpText lang="de-DE">Wird verwendet, wenn der Browser-Tab nicht sichtbar ist.</helpText>
+            <defaultValue>15000</defaultValue>
+            <min>2000</min>
+            <max>120000</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>requestTimeoutMs</name>
+            <label>Request timeout (ms)</label>
+            <label lang="de-DE">Request-Timeout (ms)</label>
+            <helpText>Abort a polling request when it exceeds this timeout.</helpText>
+            <helpText lang="de-DE">Bricht einen Polling-Request ab, wenn dieses Timeout ueberschritten wird.</helpText>
+            <defaultValue>4000</defaultValue>
+            <min>1000</min>
+            <max>30000</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>maxBackoffMs</name>
+            <label>Maximum backoff (ms)</label>
+            <label lang="de-DE">Maximaler Backoff (ms)</label>
+            <helpText>Upper limit for exponential backoff after polling errors.</helpText>
+            <helpText lang="de-DE">Obergrenze fuer den exponentiellen Backoff nach Polling-Fehlern.</helpText>
+            <defaultValue>60000</defaultValue>
+            <min>2000</min>
+            <max>300000</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>jitterPercent</name>
+            <label>Jitter (%)</label>
+            <label lang="de-DE">Jitter (%)</label>
+            <helpText>Randomizes request timing to avoid synchronized load peaks.</helpText>
+            <helpText lang="de-DE">Randomisiert Request-Zeitpunkte, um synchronisierte Lastspitzen zu vermeiden.</helpText>
+            <defaultValue>15</defaultValue>
+            <min>0</min>
+            <max>50</max>
+            <required>true</required>
+        </input-field>
+    </card>
+
+    <card>
+        <title>Server TTL</title>
+        <title lang="de-DE">Server-TTL</title>
+
+        <input-field type="int">
+            <name>reservationTtlSeconds</name>
+            <label>Cart reservation TTL (seconds)</label>
+            <label lang="de-DE">Reservierungs-TTL Warenkorb (Sekunden)</label>
+            <helpText>How long cart reservations reduce effective stock without a refresh.</helpText>
+            <helpText lang="de-DE">Wie lange Warenkorb-Reservierungen den effektiven Bestand ohne Refresh reduzieren.</helpText>
+            <defaultValue>1800</defaultValue>
+            <min>60</min>
+            <max>86400</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>viewerTtlSeconds</name>
+            <label>Viewer TTL (seconds)</label>
+            <label lang="de-DE">Betrachter-TTL (Sekunden)</label>
+            <helpText>How long a viewer is counted as active without a heartbeat.</helpText>
+            <helpText lang="de-DE">Wie lange ein Betrachter ohne Heartbeat als aktiv gezaehlt wird.</helpText>
+            <defaultValue>45</defaultValue>
+            <min>10</min>
+            <max>600</max>
+            <required>true</required>
+        </input-field>
+
+        <input-field type="int">
+            <name>cartPresenceTtlSeconds</name>
+            <label>Cart presence TTL (seconds)</label>
+            <label lang="de-DE">Cart-Presence-TTL (Sekunden)</label>
+            <helpText>Only reservations from carts with a recent heartbeat are counted.</helpText>
+            <helpText lang="de-DE">Es werden nur Reservierungen von Warenkoerben mit aktuellem Heartbeat gezaehlt.</helpText>
+            <defaultValue>120</defaultValue>
+            <min>10</min>
+            <max>3600</max>
+            <required>true</required>
+        </input-field>
+    </card>
+</config>

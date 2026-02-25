@@ -1,0 +1,22 @@
+{
+  "fib-live-product-pulse": {
+    "storefront": {
+      "status": {
+        "available": "Available now",
+        "soldout": "Sold out",
+        "reserved": "Already reserved - another customer has this item in the cart",
+        "restock": "Back soon",
+        "preorder": "Pre-order",
+        "notAvailable": "Not available"
+      },
+      "cart": {
+        "reserved": "This item is currently reserved for another customer and cannot be ordered right now."
+      },
+      "viewers": {
+        "zero": "No active viewers right now",
+        "one": "1 active viewer",
+        "many": "%count% active viewers"
+      }
+    }
+  }
+}

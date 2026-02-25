@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<container xmlns="http://symfony.com/schema/dic/services"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+        <defaults autowire="true" autoconfigure="true" public="false"/>
+
+        <service id="Fib\LiveProductPulse\Config\LiveProductPulseConfig">
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\CartReservationService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\CartPresenceService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\ViewerPresenceService"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Core\LiveProduct\Cart\ReservedProductCartValidator">
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService"/>
+            <argument type="service" id="Fib\LiveProductPulse\Config\LiveProductPulseConfig"/>
+            <tag name="shopware.cart.validator"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Subscriber\CartReservationSubscriber">
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
+        <service id="Fib\LiveProductPulse\Storefront\Controller\LiveProductPulseController" public="true">
+            <argument type="service" id="Fib\LiveProductPulse\Core\LiveProduct\ProductLiveStateService"/>
+            <tag name="controller.service_arguments"/>
+        </service>
+    </services>
+</container>
